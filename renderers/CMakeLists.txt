@@ -53,6 +53,7 @@ else()
 endif()
 
 # Check for availability of gstreamer
+if( UNIX AND NOT APPLE )
 find_package( PkgConfig )
 if( PKG_CONFIG_FOUND )
   pkg_check_modules( GST gstreamer-1.0>=1.4
@@ -69,6 +70,37 @@ if( PKG_CONFIG_FOUND )
   endif()
 else()
   message( STATUS "pkg-config not found, skipping compilation of GStreamer renderer" )
+endif()
+else()
+  find_library(GSTREAMER NAMES GStreamer)
+  message("GSTREAMER ${GSTREAMER}")
+
+  set(GSTREAMER_PATH ${GSTREAMER}/Versions/1.0)
+
+  set( RENDERER_FLAGS "${RENDERER_FLAGS} -DHAS_GSTREAMER_RENDERER" )
+
+  file(GLOB_RECURSE libs "${GSTREAMER_PATH}/lib/*.a")
+  foreach(lib ${libs})
+    if(
+      NOT ${lib} MATCHES "libcrypto"
+      AND NOT ${lib} MATCHES "libgstvulkan"
+    )
+      list(APPEND GST_LIBS ${lib})
+    endif()
+  endforeach()
+
+  set(frameworks AppKit QuartzCore OpenGL AudioToolBox CoreAudio)
+  list(TRANSFORM frameworks PREPEND "-framework ")
+
+  SET(GST_INCLUDE_DIRS ${GSTREAMER_PATH}/Headers)
+  set(GST_LIBRARIES -Wl,-dead_strip
+    ${frameworks} -liconv ${GST_LIBS}
+    # -L${GSTREAMER_PATH}/lib -F/Library/Frameworks "-framework GStreamer"
+  )
+
+  set(RENDERER_SOURCES ${RENDERER_SOURCES} audio_renderer_gstreamer.c video_renderer_gstreamer.c )
+  set(RENDERER_LINK_LIBS ${RENDERER_LINK_LIBS} ${GST_LIBRARIES} )
+  set(RENDERER_INCLUDE_DIRS ${RENDERER_INCLUDE_DIRS} ${GST_INCLUDE_DIRS})
 endif()
 
 # Create the renderers library and link against everything

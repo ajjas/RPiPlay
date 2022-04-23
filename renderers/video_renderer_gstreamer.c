@@ -30,12 +30,23 @@ typedef struct video_renderer_gstreamer_s {
 
 static const video_renderer_funcs_t video_renderer_gstreamer_funcs;
 
+#define REQ_PLUGINS REG(app) REG(libav) REG(playback) REG(autodetect) REG(videoparsersbad) REG(videoconvert) REG(audioconvert) REG(coreelements) REG(playback) REG(autodetect) REG(volume) REG(level) REG(opengl) REG(osxaudio) REG(audioparsers)
+
+#define REG(x) GST_PLUGIN_STATIC_DECLARE(x);
+REQ_PLUGINS
+#undef REG
+
 static gboolean check_plugins(void)
 {
     int i;
     gboolean ret;
     GstRegistry *registry;
-    const gchar *needed[] = {"app", "libav", "playback", "autodetect", "videoparsersbad", NULL};
+    const gchar *needed[] = {
+        #define REG(x) #x,
+        REQ_PLUGINS
+        #undef REG
+        NULL,
+    };
 
     registry = gst_registry_get();
     ret = TRUE;
@@ -60,12 +71,15 @@ video_renderer_t *video_renderer_gstreamer_init(logger_t *logger, video_renderer
     assert(renderer);
 
     gst_init(NULL, NULL);
+    #define REG(x) GST_PLUGIN_STATIC_REGISTER(x);
+    REQ_PLUGINS
+    #undef REG
 
     renderer->base.logger = logger;
     renderer->base.funcs = &video_renderer_gstreamer_funcs;
     renderer->base.type = VIDEO_RENDERER_GSTREAMER;
 
-    assert(check_plugins());
+    check_plugins();
 
     // Begin the video pipeline
     GString *launch = g_string_new("appsrc name=video_source stream-type=0 format=GST_FORMAT_TIME is-live=true !"
